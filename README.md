@@ -20,9 +20,3 @@ python -m textblob.download_corpora
 # optional, in case you need a notebook kernel
 python -m ipykernel install --user --name sentiment_env --display-name "Python3.x (sentiment)"
 ```
-Then, download the pretrained models
-```bash
-mkdir pretrained_models
-cd pretrained_models
-wget ...
-```
