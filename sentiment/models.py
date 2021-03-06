@@ -2,6 +2,7 @@ import os
 import sys
 sys.path.append(os.path.dirname(__file__))
 
+import re
 import pandas as pd
 import flair
 import nltk
@@ -16,6 +17,28 @@ from typing import Callable, Dict, List
 
 logger = logging.getLogger(__name__)
 
+
+logger.info("Loading pretrained models...")
+
+try:
+    nltk.download("vader_lexicon")
+    logger.info("NLTK loaded")
+except Exception as e:
+    msg = 'The program failed to load NLTK'
+    logger.exception(msg, exc_info=True)
+    sys.exit(msg)
+
+try:
+    flair_model = flair.models.TextClassifier.load("en-sentiment")
+    logger.info("FLAIR loaded")
+except Exception as e:
+    msg = 'The program failed to load FLAIR'
+    logger.exception(msg, exc_info=True)
+    sys.exit(msg)
+
+DISTILBERT_SENT = "distilbert-base-uncased-finetuned-sst-2-english"
+ROBERTA_SENT = "VictorSanh/roberta-base-finetuned-yelp-polarity"
+# BERT_SENT = "nlptown/bert-base-multilingual-uncased-sentiment"
 
 def sentiment_nltk(text):
 
@@ -61,21 +84,43 @@ def sentiment_flair(text):
     return {'flair_label': sentiment_dict["value"].lower(), "flair_score": sentiment_dict['confidence']}
 
 
-def transformer_classification(verbatims, model_dir):
+def transformer_classification(verbatims, model):
 
-    def _initialize_classifier(model_dir):
-        model = AutoModelForSequenceClassification.from_pretrained(model_dir)
-        tokenizer = AutoTokenizer.from_pretrained(model_dir)
+    def _initialize_classifier(model):
+        tokenizer = AutoTokenizer.from_pretrained(model)
         classifier = pipeline("sentiment-analysis", model=model, tokenizer=tokenizer)
         return classifier
+
+    def _standardize_label(model_name, label):
+        
+        roberta_standardize = {"LABEL_0": "negative", "LABEL_1": "positive"}
+        bert_standardize = {"1": "negative", "2": "negative", "3": "neutral", "4": "positive", "5": "positive"}
+        
+        # label formats returned by ROBERTA
+        if re.match("LABEL_\\d", label):
+            try:
+                label = roberta_standardize[label]
+            except:
+                loger.debug(f"{label} found in {model_name} not in standardized dict")
+        
+        # label formats returned by BERT 
+        if re.search("star", label):
+            try:
+                value = re.sub("(\\d) (.*)", "\\1", label)
+                label = bert_standardize[value]
+            except:
+                loger.debug(f"{label} found in {model_name} not in standardized dict")
+
+        return label.lower()
 
     def _get_batch_value(text, batch, model_name):
         if not text:
             return {f'{model_name}_label': None, f'{model_name}_score': np.nan}
-        return {f'{model_name}_label': batch[0]['label'], f'{model_name}_score': batch[0]['score']}
+        label = _standardize_label(model_name, batch[0]['label'])
+        return {f'{model_name}_label': label, f'{model_name}_score': batch[0]['score']}
 
-    model_name = os.path.basename(model_dir).split('_')[1]
-    classifier = _initialize_classifier(model_dir)
+    model_name = os.path.basename(model).split('-')[0]
+    classifier = _initialize_classifier(model)
     batches = zip(verbatims, map(classifier, verbatims))
     return [_get_batch_value(text, batch, model_name) for text, batch in batches]
 
@@ -93,10 +138,13 @@ class Sentiment_models(object):
         self.flair = map(self._sentiment_flair, verbatims)
         
         logger.info("running DISTILBERT sentiment model")
-        self.distilbert_sent = self._transformer_classification(verbatims, DISTILBERT_SENT)
+        self.distilbert = self._transformer_classification(verbatims, DISTILBERT_SENT)
         
         logger.info("running ROBERTA sentiment model")
-        self.roberta_sent = self._transformer_classification(verbatims, ROBERTA_SENT)
+        self.roberta = self._transformer_classification(verbatims, ROBERTA_SENT)
+
+        # logger.info("running BER sentiment model")
+        # self.bert = self._transformer_classification(verbatims, BERT_SENT)    
     
     @staticmethod
     def _sentiment_nltk(text):
@@ -134,26 +182,3 @@ class Sentiment_models(object):
             return sentiments, scores
         except Exception as e:
             logger.exception("Error occured when getting models predictions", exc_info=True)
-
-logger.info("Loading pretrained models...")
-
-try:
-    nltk.download("vader_lexicon")
-except Exception as e:
-    msg = 'The program failed to load NLTK'
-    logger.exception(msg, exc_info=True)
-    sys.exit(msg)
-
-try:
-    flair_model = flair.models.TextClassifier.load("en-sentiment")
-except Exception as e:
-    msg = 'The program failed to load FLAIR'
-    logger.exception(msg, exc_info=True)
-    sys.exit(msg)
-
-root = os.path.dirname(os.path.dirname(__file__))
-DISTILBERT_SENT = os.path.join(root, 'pretrained_models/sentiment_distilbert')
-ROBERTA_SENT = os.path.join(root, 'pretrained_models/sentiment_roberta')
-
-evaluate_path_exists(DISTILBERT_SENT)
-evaluate_path_exists(ROBERTA_SENT)
