@@ -3,7 +3,7 @@
 ## Install python environment
 Either run
 ```bash
-./install_env
+./install_env.sh
 ```
 or manually run the following steps
 ```bash
