@@ -2,3 +2,4 @@ sentiment_env/
 log/
 pretrained_models/
 .ipynb_checkpoints/
+*/__pycache__/*
