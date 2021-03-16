@@ -3,7 +3,7 @@ import sys
 sys.path.append(os.path.dirname(__file__))
 
 import logging
-import logger_init
+from logger import logger_init
 
 logger = logging.getLogger(__name__)
 

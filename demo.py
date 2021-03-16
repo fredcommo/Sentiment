@@ -5,7 +5,7 @@ sys.path.append(os.path.dirname(__file__))
 import pandas as pd
 import numpy as np
 import logging
-import sentiment.logger_init
+from sentiment.logger import logger_init
 
 from sentiment.models import Sentiment_models
 
