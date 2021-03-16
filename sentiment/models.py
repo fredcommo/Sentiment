@@ -36,10 +36,6 @@ except Exception as e:
     logger.exception(msg, exc_info=True)
     sys.exit(msg)
 
-DISTILBERT_SENT = "distilbert-base-uncased-finetuned-sst-2-english"
-ROBERTA_SENT = "VictorSanh/roberta-base-finetuned-yelp-polarity"
-# BERT_SENT = "nlptown/bert-base-multilingual-uncased-sentiment"
-
 def sentiment_nltk(text):
 
     def _standardize_sent_labels(original_label):
@@ -84,52 +80,74 @@ def sentiment_flair(text):
     return {'flair_label': sentiment_dict["value"].lower(), "flair_score": sentiment_dict['confidence']}
 
 
-def transformer_classification(verbatims, model):
+def transformer_classification(verbatims, hugging_face_model):
 
-    def _initialize_classifier(model):
-        tokenizer = AutoTokenizer.from_pretrained(model)
+    def _get_simplified_model_name(hugging_face_model):
+        return os.path.basename(hugging_face_model).split('-')[0]
+
+    def _initialize_classifier(hugging_face_model):
+        tokenizer = AutoTokenizer.from_pretrained(hugging_face_model)
+        model = AutoModelForSequenceClassification.from_pretrained(hugging_face_model)
         classifier = pipeline("sentiment-analysis", model=model, tokenizer=tokenizer)
         return classifier
 
     def _standardize_label(model_name, label):
         
-        roberta_standardize = {"LABEL_0": "negative", "LABEL_1": "positive"}
-        bert_standardize = {"1": "negative", "2": "negative", "3": "neutral", "4": "positive", "5": "positive"}
+        roberta_corresp = {"LABEL_0": "negative", "LABEL_1": "positive"}
+        twitter_corresp = {"LABEL_0": "negative", "LABEL_1": "neutral", "LABEL_2": "positive"}
+        bert_corresp = {
+            "1 star": "negative",
+            "2 stars": "neutral",
+            "3 stars": "neutral",
+            "4 stars": "neutral",
+            "5 stars": "positive"
+            }
         
-        # label formats returned by ROBERTA
+        # label formats returned by ROBERTA and TWITTER-ROBERTA
         if re.match("LABEL_\\d", label):
             try:
-                label = roberta_standardize[label]
+                if re.search('roberta', model_name):
+                    label = roberta_corresp[label]
+                elif re.search('twitter', model_name):
+                    label = twitter_corresp[label]
             except:
-                loger.debug(f"{label} found in {model_name} not in standardized dict")
+                logger.error(f"{label} found in {model_name} not in standardized dict")
         
         # label formats returned by BERT 
         if re.search("star", label):
             try:
-                value = re.sub("(\\d) (.*)", "\\1", label)
-                label = bert_standardize[value]
+                label = bert_corresp[label]
             except:
-                loger.debug(f"{label} found in {model_name} not in standardized dict")
+                logger.error(f"{label} found in {model_name} not in standardized dict")
 
         return label.lower()
 
     def _get_batch_value(text, batch, model_name):
         if not text:
             return {f'{model_name}_label': None, f'{model_name}_score': np.nan}
+
         label = _standardize_label(model_name, batch[0]['label'])
         return {f'{model_name}_label': label, f'{model_name}_score': batch[0]['score']}
 
-    model_name = os.path.basename(model).split('-')[0]
-    classifier = _initialize_classifier(model)
+    model_name = _get_simplified_model_name(hugging_face_model)
+    
+    logger.info(f"Initializing {model_name}")
+    classifier = _initialize_classifier(hugging_face_model)
+
     batches = zip(verbatims, map(classifier, verbatims))
     return [_get_batch_value(text, batch, model_name) for text, batch in batches]
 
+DISTILBERT_SENT = "distilbert-base-uncased-finetuned-sst-2-english"
+ROBERTA_SENT = "VictorSanh/roberta-base-finetuned-yelp-polarity"
+TWITTER_SENT = "cardiffnlp/twitter-roberta-base-sentiment"
+BERT_SENT = "nlptown/bert-base-multilingual-uncased-sentiment"
+TAPAS_SENT = "google/tapas-base-finetuned-tabfact"
 
 class Sentiment_models(object):
     
     def __init__(self, verbatims):
-        logger.info("running NLTK sentiment model")
-        self.nltk_sent = map(self._sentiment_nltk, verbatims)
+        # logger.info("running NLTK sentiment model")
+        # self.nltk_sent = map(self._sentiment_nltk, verbatims)
 
         logger.info("running TEXTBLOB sentiment model")
         self.txtblob_sent = map(self._sentiment_textblob, verbatims)
@@ -143,8 +161,15 @@ class Sentiment_models(object):
         logger.info("running ROBERTA sentiment model")
         self.roberta = self._transformer_classification(verbatims, ROBERTA_SENT)
 
-        # logger.info("running BER sentiment model")
-        # self.bert = self._transformer_classification(verbatims, BERT_SENT)    
+        logger.info("running TWITTER-ROBERTA sentiment model")
+        self.twitter = self._transformer_classification(verbatims, TWITTER_SENT)
+
+        logger.info("running BER sentiment model")
+        self.bert = self._transformer_classification(verbatims, BERT_SENT)    
+
+        logger.info("running GOOGLE-TAPAS sentiment model")
+        self.tapas = self._transformer_classification(verbatims, TAPAS_SENT)    
+    
     
     @staticmethod
     def _sentiment_nltk(text):
@@ -159,26 +184,58 @@ class Sentiment_models(object):
         return sentiment_flair(text)
 
     @staticmethod
-    def _transformer_classification(verbatims, model_dir):
-        return transformer_classification(verbatims, model_dir)
+    def _transformer_classification(verbatims, hugging_face_model):
+        return transformer_classification(verbatims, hugging_face_model)
     
     @staticmethod
     def sentiment_vote(series):
+
+        def _neutral_is_in_index(counts):
+            return "neutral" in counts[counts == counts.max()]
+
+        def _both_neg_and_pos(counts):
+            top_count = counts[counts == counts.max()]
+            return 'negative' in top_count and 'positive' in top_count
+
+        def _vote(counts):
+            if _neutral_is_in_index(counts):
+                return "neutral"
+            if _both_neg_and_pos(counts):
+                return "neutral"
+            return str(counts[counts == counts.max()].index[0])
+
         if series.isnull().all():
             return None
-        counts = series.value_counts()
-        max_count = counts[0]
-        return "/".join(counts[counts == max_count].index)
+
+        return _vote(series.value_counts())
+
+        # return "/".join(counts[counts == max_count].index)
 
     def get_predictions(self):
         try:
-            logger.info("Compiling all sentiment predictions.")
+            logger.info("Extracting all sentiment predictions.")
             list_predictions = [pd.DataFrame(sent) for sent in self.__dict__.values()]
+
+            logger.info("Concatenating all sentiment predictions.")
             predictions = pd.concat(list_predictions, axis=1)
             label_columns = predictions.columns.str.contains('label')
-            sentiments = predictions.loc[:,label_columns]
-            sentiments['majority vote'] = sentiments.apply(self.sentiment_vote, axis=1)
-            scores = predictions.loc[:,~label_columns]
-            return sentiments, scores
+
+            try:
+                logger.info("Extracting all sentiment predictions.")
+                sentiments = predictions.loc[:,label_columns]
+            except Exception as e:
+                logger.exception("label colmnns not found", exc_info=True)
+
+            try:
+                sentiments['majority vote'] = sentiments.apply(self.sentiment_vote, axis=1)
+            except Exception as e:
+                logger.exception("Error when voting", exc_info=True)
+
+            try:
+                scores = predictions.loc[:,~label_columns]
+                return sentiments, scores
+            except Exception as e:
+                logger.exception("Error when getting score columns", exc_info=True)
+
         except Exception as e:
-            logger.exception("Error occured when getting models predictions", exc_info=True)
+            logger.exception("An error occured when getting models predictions", exc_info=True)
