@@ -3,3 +3,4 @@ log/
 pretrained_models/
 .ipynb_checkpoints/
 */__pycache__/*
+*/*.pyc
