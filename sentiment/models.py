@@ -141,7 +141,9 @@ DISTILBERT_SENT = "distilbert-base-uncased-finetuned-sst-2-english"
 ROBERTA_SENT = "VictorSanh/roberta-base-finetuned-yelp-polarity"
 TWITTER_SENT = "cardiffnlp/twitter-roberta-base-sentiment"
 BERT_SENT = "nlptown/bert-base-multilingual-uncased-sentiment"
-TAPAS_SENT = "google/tapas-base-finetuned-tabfact"
+
+# Not working: requires specific data format, not documented
+# TAPAS_SENT = "google/tapas-base-finetuned-tabfact"
 
 class Sentiment_models(object):
     
@@ -167,8 +169,8 @@ class Sentiment_models(object):
         logger.info("running BER sentiment model")
         self.bert = self._transformer_classification(verbatims, BERT_SENT)    
 
-        logger.info("running GOOGLE-TAPAS sentiment model")
-        self.tapas = self._transformer_classification(verbatims, TAPAS_SENT)    
+        # logger.info("running GOOGLE-TAPAS sentiment model")
+        # self.tapas = self._transformer_classification(verbatims, TAPAS_SENT)    
     
     
     @staticmethod
