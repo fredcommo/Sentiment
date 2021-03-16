@@ -30,7 +30,7 @@ python -m ipykernel install --user --name sentiment_env --display-name "Python3.
 On macOS and linux
 
 ```bash
-source sentiment_env\bin\activate
+source sentiment_env/bin/activate
 ```
 
 On Windows
