@@ -11,6 +11,11 @@ from sentiment.models import Sentiment_models
 
 logger = logging.getLogger(__name__)
 
+def crosstab(series1, series2):
+    ct = pd.crosstab(series1, series2)
+    props = ct.apply(lambda row: row/row.sum(), axis=1)
+    return props
+
 if __name__=="__main__":
     curr_dir = os.path.dirname(__file__)
     filename = "data/sentiment140.csv"
@@ -28,3 +33,8 @@ if __name__=="__main__":
     print(scores)
 
     print(pd.crosstab(df.polarity, sentiments["majority vote"]))
+    print()
+
+    for serie in sentiments.columns:
+        print(crosstab(df.polarity, sentiments[serie]))
+        print()
