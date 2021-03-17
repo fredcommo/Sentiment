@@ -10,8 +10,8 @@ from nltk.sentiment.vader import SentimentIntensityAnalyzer
 from textblob import TextBlob
 from transformers import AutoModelForSequenceClassification, AutoTokenizer, pipeline
 import logging
-from logger import logger_init
-from models_utils import evaluate_path_exists
+from sentiment.logger import logger_init
+from utils import evaluate_path_exists
 
 from typing import Callable, Dict, List
 

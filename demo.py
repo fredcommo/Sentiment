@@ -7,7 +7,7 @@ import numpy as np
 import logging
 from sentiment.logger import logger_init
 
-from sentiment.models import Sentiment_models
+from sentiment.models.sentiment_models import Sentiment_models
 
 logger = logging.getLogger(__name__)
 
