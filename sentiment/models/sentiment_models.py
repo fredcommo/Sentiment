@@ -4,6 +4,7 @@ sys.path.append(os.path.dirname(__file__))
 
 import re
 import pandas as pd
+import numpy as np
 import flair
 import nltk
 from nltk.sentiment.vader import SentimentIntensityAnalyzer
