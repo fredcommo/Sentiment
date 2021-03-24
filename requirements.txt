@@ -1,3 +1,4 @@
+pytest
 pandas
 numpy<1.20.0
 pyldavis==2.1.2
