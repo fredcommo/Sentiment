@@ -14,6 +14,7 @@ class Test_Sentiment_Textblob():
         verbatim = self.valid_verbatim
         output = sentiment_textblob(verbatim)
         
+        assert isinstance(output, dict)
         assert "textblob_label" in output.keys(), "Key 'textblob_label' not in output"
         assert "textblob_score" in output.keys(), "Key 'textblob_score' not in output"
         
@@ -28,6 +29,7 @@ class Test_Sentiment_Textblob():
         expected = {"textblob_label": None, "textblob_score": np.nan}
         output = sentiment_textblob(verbatim)
 
+        assert isinstance(output, dict)
         assert "textblob_label" in output.keys(), "Key 'textblob_label' not in output"
         assert "textblob_score" in output.keys(), "Key 'textblob_score' not in output"
         
@@ -38,6 +40,7 @@ class Test_Sentiment_Textblob():
         verbatim = self.special_char
         output = sentiment_textblob(verbatim)
 
+        assert isinstance(output, dict)
         assert "textblob_label" in output.keys(), "Key 'textblob_label' not in output"
         assert "textblob_score" in output.keys(), "Key 'textblob_score' not in output"
         
