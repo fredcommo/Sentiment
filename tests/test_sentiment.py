@@ -1,6 +1,6 @@
 import pytest
 import numpy as np
-from sentiment.models.sentiment_models import sentiment_textblob
+from sentiment.models.sentiment_analysis import sentiment_textblob
 
 
 class Test_Sentiment_Textblob():
