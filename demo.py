@@ -32,9 +32,20 @@ if __name__=="__main__":
     print(sentiments)
     print(scores)
 
-    print(pd.crosstab(df.polarity, sentiments["majority vote"]))
+    for serie in sentiments.columns:
+        print(crosstab(df.label, sentiments[serie]))
+        print()
+
+    # Majority vote crosstable
+    print(pd.crosstab(df.label, sentiments["majority vote"]))
     print()
 
-    for serie in sentiments.columns:
-        print(crosstab(df.polarity, sentiments[serie]))
-        print()
+    # Weighted vote crosstable
+    print(pd.crosstab(df.label, sentiments["weighted vote"]))
+    print()
+
+    # Voting methods performances (accuracy)
+    acc_maj_vote = np.mean(df.label == sentiments["majority vote"])
+    acc_weighted_vote = np.mean(df.label == sentiments["weighted vote"])
+    print("Majority vote accuracy: {:.3f}".format(acc_maj_vote))
+    print("Weighted vote accuracy: {:.3f}".format(acc_weighted_vote))
