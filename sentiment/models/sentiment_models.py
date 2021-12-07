@@ -16,10 +16,12 @@ from utils import evaluate_path_exists
 
 from typing import Callable, Dict, List
 
+import pickle
+
 logger = logging.getLogger(__name__)
 
 
-logger.info("Loading pretrained models...")
+logger.info("Loading pretrained sentiment models...")
 
 try:
     nltk.download("vader_lexicon")
@@ -149,8 +151,6 @@ BERT_SENT = "nlptown/bert-base-multilingual-uncased-sentiment"
 class Sentiment_models(object):
     
     def __init__(self, verbatims):
-        # logger.info("running NLTK sentiment model")
-        # self.nltk_sent = map(self._sentiment_nltk, verbatims)
 
         logger.info("running TEXTBLOB sentiment model")
         self.txtblob_sent = map(self._sentiment_textblob, verbatims)
@@ -169,9 +169,6 @@ class Sentiment_models(object):
 
         logger.info("running BER sentiment model")
         self.bert = self._transformer_classification(verbatims, BERT_SENT)    
-
-        # logger.info("running GOOGLE-TAPAS sentiment model")
-        # self.tapas = self._transformer_classification(verbatims, TAPAS_SENT)    
     
     
     @staticmethod
@@ -191,7 +188,7 @@ class Sentiment_models(object):
         return transformer_classification(verbatims, hugging_face_model)
     
     @staticmethod
-    def sentiment_vote(series):
+    def majority_vote(series):
 
         def _neutral_is_in_index(counts):
             return "neutral" in counts[counts == counts.max()]
@@ -214,6 +211,29 @@ class Sentiment_models(object):
 
         # return "/".join(counts[counts == max_count].index)
 
+    @staticmethod
+    def weighted_vote(series):
+        
+        def _load_pickle(filename):
+            try:
+                filepath = os.path.dirname(__file__) + f"/weighted_vote/{filename}.sav"
+                with open(filepath, 'rb') as f:
+                    model = pickle.load(f)
+                logger.info(f"{filename}.sav loaded")
+                return model
+            except Exception as e:
+                msg = f"{filename}.sav not loaded"
+                logger.exception(msg, exc_info=True)
+                sys.exit(msg)
+
+        encoder = _load_pickle("one_hot_encoder")
+        logreg = _load_pickle("weighted_vote")
+
+        features = encoder.transform(series).toarray()
+        weighted_vote = logreg.predict(features)
+        
+        return weighted_vote
+
     def get_predictions(self):
         try:
             logger.info("Extracting all sentiment predictions.")
@@ -230,15 +250,25 @@ class Sentiment_models(object):
                 logger.exception("label colmnns not found", exc_info=True)
 
             try:
-                sentiments['majority vote'] = sentiments.apply(self.sentiment_vote, axis=1)
+                logger.info("Running naive majority vote.")
+                majority_vote = sentiments.apply(self.majority_vote, axis=1)
             except Exception as e:
-                logger.exception("Error when voting", exc_info=True)
+                logger.exception("Error when majority voting", exc_info=True)
 
             try:
-                scores = predictions.loc[:,~label_columns]
-                return sentiments, scores
+                logger.info("Running weighted vote.")
+                weighted_vote = self.weighted_vote(sentiments)
             except Exception as e:
-                logger.exception("Error when getting score columns", exc_info=True)
+                logger.exception("Error when weighted voting", exc_info=True)
+
+            sentiments['majority vote'] = majority_vote
+            sentiments['weighted vote'] = weighted_vote
+
+            try:
+                probabilities = predictions.loc[:,~label_columns]
+                return sentiments, probabilities
+            except Exception as e:
+                logger.exception("Error when getting probability columns", exc_info=True)
 
         except Exception as e:
             logger.exception("An error occured when getting models predictions", exc_info=True)
