@@ -7,7 +7,7 @@ import numpy as np
 import logging
 from sentiment.logger import logger_init
 
-from sentiment.models.sentiment_models import Sentiment_models
+from sentiment.models.sentiment_analysis import Sentiments
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +24,7 @@ if __name__=="__main__":
     df = pd.read_csv(os.path.join(curr_dir, filename), error_bad_lines=False, sep=';')
 
     verbatims = df.text.to_list()
-    S = Sentiment_models(verbatims)
+    S = Sentiments(verbatims)
     sentiments, scores = S.get_predictions()
 
     logger.info("All done!")
